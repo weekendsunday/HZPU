@@ -16,8 +16,6 @@
 - **互动**：楼层回复、提及通知、站内私信（会话式）、全站搜索（帖子/用户）、热榜（回复/浏览加权 + 时间衰减）
 - **管理后台**：审核队列、版块管理、用户封禁/设管、敏感词、审核日志
 
-## 昵称与真实姓名
-
 ## 品牌与视觉
 
 站点按学校官方标识做了基础品牌化，主色取自校徽：
@@ -132,10 +130,67 @@ SELECT name, COUNT(*) c FROM users GROUP BY name HAVING c > 1;
 以下内容已有 API 契约/占位，未做完整实现或需要外部资源，接入时按需扩展：
 
 - **LLM 审核 agent**：审核管线已预留第二层（`src/lib/moderation.ts`），配置 `MODERATION_LLM_URL` 即启用；未配置时仅本地敏感词审核。LLM 不可达时保守放行（不误杀），需强审核场景建议改为拒绝并告警。
-- **校园统一认证**：当前为学号+密码自建账号。若学校提供统一身份认证（CAS/OAuth），替换 `src/app/api/auth/*` 即可，用户表结构兼容。
+- **校园统一认证**：代码已完整实现，等待学校提供 IdP 地址与密钥，**只改 `.env` 即可启用**，详见下文「校园统一身份认证（SSO）」。
 - **学号真实性**：当前仅校验学号格式，不核验学号是否真实属于本校学生。防校外注册需接入教务/统一认证数据源或注册审核流程。
+  **学信网（CHSI）无法自动读取**：其官方未开放任何查询 API/OAuth，只有本人主动生成的「在线验证码」可用于人工核验，因此不能作为注册链路的数据源；可行路径是学校统一认证（自带学号权威性），或管理员按名单 CSV 白名单导入。
 - **站内搜索**：当前为 SQL `LIKE` 子串匹配，校园规模够用；数据量大后可换 MySQL FULLTEXT 或 Elasticsearch（搜索接口形状不变）。
 - **图片处理**：仅校验类型/大小后原样存储，无缩略图/水印/鉴黄；违规图片依赖审核层与人工巡查。
+
+## 校园统一身份认证（SSO）
+
+代码已实现、默认关闭，等学校网络信息中心给出接入参数后**只改环境变量**即可启用，无需改代码。
+未启用时登录/注册页仍走「学号 + 密码」，并在表单下方显示一条虚线提示说明该通道已预留。
+
+启用后登录页出现「学校统一身份认证」按钮，流程为：
+
+```
+GET /api/auth/sso/start        → 302 跳 IdP 授权页（state 存 httpOnly Cookie，10 分钟有效）
+GET /api/auth/sso/callback     → 校验票据 / 换 token → 落库登录 → 回跳原页面
+```
+
+三种用户归宿（`src/lib/sso-user.ts`）：
+
+| 情况 | 处理 |
+| --- | --- |
+| 已绑定过（`ssoProvider` + `ssoSubject` 命中） | 直接登录，并刷新姓名/学院/班级 |
+| 学号已存在但未绑定 | 绑定到该本地账号（保留原密码与昵称） |
+| 全新用户 | 建号登录 |
+
+安全约定：
+
+- SSO 账号写入一个**随机不可猜的 passwordHash**，因此无法用密码登录方式冒用该账号。
+- 真实姓名来自 IdP 时写 `real_name_source = 'sso'`；初始昵称取 IdP 昵称，没有则用「同学 + 学号后 4 位」，**故意不使用真名**，避免绕过隐私承诺。
+- `SSO_CLIENT_SECRET` 只在服务端使用（`src/app/api/auth/sso/*` 是 route handler），不会进入客户端 bundle。
+- 失败一律回跳 `/login?sso_error=<code>`，码表与文案见 `src/lib/sso-client.ts`（`state`/`denied`/`validate_failed`/`profile`/`banned` 等）。
+
+### 支持的协议
+
+`SSO_PROTOCOL` 二选一：
+
+| 值 | 适用 | 交互 |
+| --- | --- | --- |
+| `cas`（默认） | 国内高校最常见，CAS 2.0/3.0 | `/login?service=` → `/serviceValidate?ticket=` |
+| `oauth2` | OAuth 2.0 / OIDC | `/oauth/authorize` → `/oauth/token` → userinfo |
+
+### 环境变量
+
+| 变量 | 说明 |
+| --- | --- |
+| `SSO_ENABLED` | `true` 才启用；默认 `false` |
+| `SSO_PROTOCOL` | `cas` \| `oauth2` |
+| `SSO_BASE_URL` | IdP 根地址，如 `https://sso.hzpu.edu.cn`；留空即视为未配置 |
+| `SSO_LOGIN_PATH` | 留空 = cas 用 `/login`、oauth2 用 `/oauth/authorize` |
+| `SSO_VALIDATE_PATH` | 仅 cas，默认 `/serviceValidate` |
+| `SSO_TOKEN_PATH` / `SSO_USERINFO_PATH` | 仅 oauth2，默认 `/oauth/token`、`/oauth/userinfo` |
+| `SSO_CLIENT_ID` / `SSO_CLIENT_SECRET` | 学校分配的应用凭据 |
+| `SSO_SCOPE` | 仅 oauth2，默认 `openid profile` |
+| `SSO_REDIRECT_URI` | 留空则按请求 Host 推导为 `<origin>/api/auth/sso/callback`；固定回调地址的 IdP 必须显式配置 |
+| `SSO_LABEL` | 按钮文案，默认「学校统一身份认证」 |
+| `SSO_TLS_INSECURE` | `true` 跳过 TLS 校验，**仅限校内自签证书的自建 IdP** |
+| `SSO_ATTR_STUDENT_ID` / `_REAL_NAME` / `_NICKNAME` / `_COLLEGE` / `_CLASS_NAME` | IdP 返回属性的字段名映射，默认 `studentId` / `realName` / `nickname` / `college` / `className` |
+
+> 向网络信息中心索要：IdP 地址、协议（CAS 还是 OIDC）、`client_id`/`client_secret`、回调地址白名单、以及学号/姓名/学院/班级对应的属性名。
+> 启用前记得先跑一次 `prisma db push`，`users` 表新增了 `ssoProvider`/`ssoSubject`/`ssoSyncedAt`/`realNameSource`/`college`/`className` 六列。
 
 ## API 一览
 
@@ -146,6 +201,8 @@ SELECT name, COUNT(*) c FROM users GROUP BY name HAVING c > 1;
 | POST | `/api/auth/register` | 学号注册 `{studentId,name,realName,password}`，昵称重复返回 409 |
 | POST | `/api/auth/login` / `logout` | 登录 / 登出 |
 | GET | `/api/auth/me` | 当前用户 |
+| GET | `/api/auth/sso/start` | 发起统一身份认证（未启用时 302 回 `/login?sso_error=disabled`） |
+| GET | `/api/auth/sso/callback` | IdP 回调：校验票据、绑定/建号、下发会话 |
 | GET | `/api/boards` | 版块列表 |
 | GET | `/api/boards/[slug]` | 版块帖子 `?sort=new\|hot` |
 | GET/POST | `/api/posts` | 帖子列表 / 发帖（走审核） |

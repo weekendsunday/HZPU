@@ -401,6 +401,51 @@ select.input {
   margin-bottom: 16px;
 }
 
+/* ---------- 学校统一身份认证（SSO） ---------- */
+
+.sso-block {
+  margin-bottom: 18px;
+}
+
+.sso-block .btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+}
+
+.sso-note {
+  background: #f1f3f6;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.sso-note strong {
+  color: var(--fg);
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 /* ---------- 列表项 ---------- */
 
 .post-item {

@@ -21,6 +21,16 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  // ---- 学校统一身份认证（SSO）绑定信息 ----
+  // ssoProvider 存协议族（如 "cas" / "oauth2"），ssoSubject 存 IdP 内的唯一标识；
+  // 我校统一身份认证通常是「学号」或一串 uid。未接入时两者均为空，不影响学号密码登录。
+  ssoProvider    String?   @map("sso_provider")
+  ssoSubject     String?   @map("sso_subject")
+  ssoSyncedAt    DateTime? @map("sso_synced_at") // 最近一次由 SSO 同步资料的时间
+  realNameSource String    @default("manual") @map("real_name_source") // manual(自行填写) | sso(认证同步)
+  college        String    @default("") // 学院（SSO 返回时自动填充）
+  className      String    @default("") @map("class_name") // 班级（SSO 返回时自动填充）
+
   posts         Post[]
   floors        Floor[]
   notifications Notification[]
@@ -29,6 +39,7 @@ model User {
   conversationsB   Conversation[] @relation("ConvB")
   uploadedImages   Image[]
 
+  @@unique([ssoProvider, ssoSubject]) // 同一 IdP 身份只能绑定一个账号
   @@map("users")
 }
 

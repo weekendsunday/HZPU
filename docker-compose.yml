@@ -33,6 +33,10 @@ services:
       UPLOAD_DIR: /data/uploads
       # 仅内网访问：外网来源返回 403。关闭需设 false，并自行完成 ICP 备案。
       INTRANET_ONLY: "true"
+      # 学校统一身份认证（通道已预留，拿到 IdP 凭据后把 SSO_ENABLED 改 true 并补齐其余项）
+      SSO_ENABLED: "false"
+      SSO_PROTOCOL: "cas"
+      SSO_BASE_URL: ""
       HOSTNAME: 0.0.0.0
     volumes:
       - hzpu_uploads:/data/uploads

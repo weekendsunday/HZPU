@@ -8,10 +8,39 @@ const secret = new TextEncoder().encode(
   process.env.SESSION_SECRET || "dev-only-secret-change-me"
 );
 
+const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 天
+
 export type SessionUser = Pick<
   User,
   "id" | "studentId" | "name" | "realName" | "role" | "status"
 >;
+
+/** 构造 SessionUser 时统一用这份 select，避免各路由漏字段。 */
+export const SESSION_USER_SELECT = {
+  id: true,
+  studentId: true,
+  name: true,
+  realName: true,
+  role: true,
+  status: true,
+} as const;
+
+/** 会话 Cookie 名与属性；SSO 回调这类需要直接写响应的场景用它。 */
+export function sessionCookie(name: string, value: string, maxAge = SESSION_MAX_AGE) {
+  return {
+    name,
+    value,
+    options: {
+      httpOnly: true,
+      sameSite: "lax" as const,
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge,
+    },
+  };
+}
+
+export const SESSION_COOKIE_NAME = COOKIE_NAME;
 
 export async function createSessionToken(user: SessionUser): Promise<string> {
   return new SignJWT({
@@ -28,13 +57,8 @@ export async function createSessionToken(user: SessionUser): Promise<string> {
 
 export async function setSessionCookie(user: SessionUser): Promise<void> {
   const token = await createSessionToken(user);
-  cookies().set(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  const c = sessionCookie(COOKIE_NAME, token);
+  cookies().set(c.name, c.value, c.options);
 }
 
 export function clearSessionCookie(): void {
@@ -59,14 +83,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!payload) return null;
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: {
-      id: true,
-      studentId: true,
-      name: true,
-      realName: true,
-      role: true,
-      status: true,
-    },
+    select: SESSION_USER_SELECT,
   });
   if (!user || user.status !== "ACTIVE") return null;
   return user;
