@@ -1,0 +1,196 @@
+// HZPU 校园论坛 — 完整数据模型
+// 状态约定：Post/Floor 的 status: PENDING(待审) -> APPROVED(已发布) / REJECTED(已驳回)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  studentId    String   @unique @map("student_id") // 学号，注册唯一
+  name         String // 真实姓名或昵称，注册时填写
+  passwordHash String   @map("password_hash")
+  role         Role     @default(USER) // USER | ADMIN
+  status       UserStatus @default(ACTIVE) // ACTIVE | BANNED
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  posts         Post[]
+  floors        Floor[]
+  notifications Notification[]
+  sentMessages     Message[]      @relation("MessageSender")
+  conversationsA   Conversation[] @relation("ConvA")
+  conversationsB   Conversation[] @relation("ConvB")
+  uploadedImages   Image[]
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+}
+
+model Board {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique // URL 用，如 "general"
+  description String  @default("")
+  sort        Int     @default(0) // 越小越靠前
+  locked      Boolean @default(false) // 锁定后禁止发帖
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  posts Post[]
+
+  @@map("boards")
+}
+
+enum ContentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Post {
+  id           String        @id @default(cuid())
+  boardId      String        @map("board_id")
+  board        Board         @relation(fields: [boardId], references: [id])
+  authorId     String        @map("author_id")
+  author       User          @relation(fields: [authorId], references: [id])
+  title        String
+  body         String        @db.Text // 主楼正文，Markdown
+  status       ContentStatus @default(PENDING)
+  rejectReason String?       @map("reject_reason")
+  viewCount    Int           @default(0) @map("view_count")
+  replyCount   Int           @default(0) @map("reply_count")
+  hotScore     Float         @default(0) @map("hot_score")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  lastReplyAt  DateTime      @default(now()) @map("last_reply_at")
+
+  floors        Floor[]
+  notifications Notification[]
+  images        Image[]
+
+  @@index([boardId, status, lastReplyAt(sort: Desc)])
+  @@index([status, hotScore(sort: Desc)])
+  @@index([authorId])
+  @@map("posts")
+}
+
+model Floor {
+  id           String        @id @default(cuid())
+  postId       String        @map("post_id")
+  post         Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId     String        @map("author_id")
+  author       User          @relation(fields: [authorId], references: [id])
+  content      String        @db.Text // Markdown
+  floorNo      Int           @map("floor_no") // 从 1 开始；0 为主楼时此表不含主楼，楼层从 2 计也可，统一自增即可
+  status       ContentStatus @default(PENDING)
+  rejectReason String?       @map("reject_reason")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@unique([postId, floorNo])
+  @@index([postId, status, floorNo])
+  @@map("floors")
+}
+
+// 审核日志：自动化审核与人工审核都落一条
+model ModerationLog {
+  id         String   @id @default(cuid())
+  targetType String   @map("target_type") // "POST" | "FLOOR"
+  targetId   String   @map("target_id")
+  action     String // "APPROVE" | "REJECT"
+  auto       Boolean  @default(true) // 是否自动审核
+  reason     String   @default("")
+  reviewerId String?  @map("reviewer_id") // 人工审核时的管理员
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([targetType, targetId])
+  @@map("moderation_logs")
+}
+
+model SensitiveWord {
+  id        String   @id @default(cuid())
+  word      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("sensitive_words")
+}
+
+enum NotificationType {
+  REPLY   // 回复了我的帖子/楼层
+  MENTION // @提到了我
+  SYSTEM  // 系统通知（审核结果等）
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id") // 接收者
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  postId    String?          @map("post_id")
+  post      Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  actorId   String?          @map("actor_id") // 触发者
+  message   String           @default("")
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([userId, read, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model Conversation {
+  id           String   @id @default(cuid())
+  userAId      String   @map("user_a_id") // 字典序较小的用户 id，保证唯一
+  userA        User     @relation("ConvA", fields: [userAId], references: [id], onDelete: Cascade)
+  userBId      String   @map("user_b_id")
+  userB        User     @relation("ConvB", fields: [userBId], references: [id], onDelete: Cascade)
+  lastMessageAt DateTime @default(now()) @map("last_message_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  messages Message[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId, lastMessageAt(sort: Desc)])
+  @@index([userBId, lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String       @map("sender_id")
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+  content        String       @db.Text
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model Image {
+  id         String   @id @default(cuid())
+  uploaderId String   @map("uploader_id")
+  uploader   User     @relation(fields: [uploaderId], references: [id])
+  postId     String?  @map("post_id")
+  post       Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  fileName   String   @map("file_name") // 磁盘文件名（含相对路径）
+  mime       String
+  size       Int
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("images")
+}

@@ -1,0 +1,36 @@
+services:
+  mysql:
+    image: mysql:8
+    container_name: hzpu-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: hzpu_forum
+    ports:
+      - "3307:3306"
+    volumes:
+      - hzpu_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "mysql://root:rootpassword@mysql:3306/hzpu_forum"
+      SESSION_SECRET: "e0c991335be644e3fd22ac68d4e99f9c2c3157c8fc617ab5679b0983f0ba80a3"
+      CRON_SECRET: "a3c59ce1900d261f33d364b4339c5e692880e7d062150ab5cc245f972b238b54"
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - hzpu_uploads:/data/uploads
+
+volumes:
+  hzpu_mysql:
+  hzpu_uploads:
