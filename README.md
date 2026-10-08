@@ -2,6 +2,7 @@
 
 参照浙江大学 CC98 的校内论坛：版块 + 标题楼层帖，学号注册，先审后发（自动审核），无匿名发帖。
 采用**昵称公开 + 实名留档**：昵称全站唯一并对外显示，真实姓名允许重名，仅本人与管理员可见。
+站点默认**只对校园内网开放**，外网来源返回 403。
 
 技术栈：Next.js 14 (App Router) + TypeScript + Prisma + MySQL。
 
@@ -78,16 +79,42 @@ npm run dev
 | `ADMIN_STUDENT_ID` / `ADMIN_NAME` / `ADMIN_PASSWORD` | 种子管理员（仅首次 seed 生效） |
 | `MODERATION_LLM_URL` / `MODERATION_LLM_MODEL` | 可选 LLM 审核 agent（Ollama 等 OpenAI 兼容 `/api/generate` 格式），留空则仅敏感词审核 |
 | `UPLOAD_DIR` | 图片上传目录（默认 `uploads`，docker 下挂 `/data/uploads`） |
+| `INTRANET_ONLY` | 仅内网访问开关，默认开启；设 `"false"` 才对公网开放 |
 | `NEXT_PUBLIC_SITE_NAME` | 站点显示名 |
 
-## 部署到物理服务器
+## 仅校内内网部署（默认形态）
 
 1. 安装 Docker + docker compose，克隆本仓库
 2. `docker compose up -d --build` 后执行上面的 db push / seed
-3. 用 nginx/caddy 反向代理 3000 端口，配置 HTTPS（国内服务器还需 ICP 备案 + 公安备案后方可绑定域名）
-4. 定时重算热榜：crontab 加 `*/10 * * * * curl -X POST -H "x-cron-secret: <CRON_SECRET>" http://localhost:3000/api/cron/recompute-hot`（不配置也不影响基本运行，仅热榜随互动即时刷新、衰减略滞后）
+3. 定时重算热榜：crontab 加 `*/10 * * * * curl -X POST -H "x-cron-secret: <CRON_SECRET>" http://localhost:3000/api/cron/recompute-hot`（不配置也不影响基本运行，仅热榜随互动即时刷新、衰减略滞后）
 
 数据备份：备份 `hzpu_mysql`（数据库）与 `hzpu_uploads`（图片）两个 docker volume。
+
+### 内网边界怎么保证
+
+站点**不对公网暴露**，是三层配合的结果，应用层只是最后一道兜底：
+
+| 层 | 做法 | 说明 |
+| --- | --- | --- |
+| 网络层（主要） | 服务器只分配校园网内网 IP；不做公网端口映射；不做 frp / 内网穿透 | 真正的边界。没有公网入口，外网根本连不上 |
+| 反向代理 | `deploy/nginx-intranet.conf.example` 里的 `allow 10/8, 172.16/12, 192.168/16, 127/32` + `deny all` | 需要按学校实际出口网段调整 |
+| 应用层（兜底） | `src/middleware.ts` + `src/lib/intranet.ts`，`INTRANET_ONLY` 默认开 | 取 `X-Real-IP`，缺省再取 `X-Forwarded-For` 最左侧；非私网地址（私网/环回/链路本地/CGNAT/IPv6 ULA 之外）返回 403 拦截页 |
+
+三点必须知道：
+
+- **应用层判定依赖代理头**。请求若绕过 nginx 直接打到应用（例如学生直接访问 `http://内网IP:3000`），没有来源头可判，middleware 会放行——这正是它只能当兜底的原因，边界仍应交给防火墙/网段。用 nginx 时记得按示例透传 `X-Real-IP`、`X-Forwarded-For`。
+- **代理必须「覆写」而不是「追加」来源头**。nginx 里要用 `proxy_set_header X-Real-IP $remote_addr;` 与 `proxy_set_header X-Forwarded-For $remote_addr;`；若用 `$proxy_add_x_forwarded_for`，客户端自带的值会留在最左侧，只要发一个 `X-Forwarded-For: 10.0.0.1` 就能伪装成内网地址绕过兜底判定（示例配置已按覆写写好）。
+- **应用端口默认只绑本机**。`docker-compose.yml` 里是 `127.0.0.1:3000:3000` 与 `127.0.0.1:3307:3306`，局域网客户端不能直连应用与数据库，必须经同机 nginx —— 这样「内网」这一层判断就落在 nginx 的 `allow/deny` 上，而不是靠客户端可伪造的请求头。若确实要让内网客户端直连 3000，改成 `"3000:3000"`，并在防火墙只放行内网网段。
+
+### 校外访问怎么办
+
+不要自己开公网端口，正规做法是把服务留在内网、让用户走**学校 VPN** 接入校园网后再访问。这样站点始终不具备公网入口，也就仍属于内网服务。
+
+### 关于备案
+
+- 仅内网访问时，站点不属于「通过互联网向公众提供信息服务」，**通常不需要 ICP 备案与公安联网备案**；`edu.cn` 校内子域走学校网络中心/CERNET 体系，也不是普通企业备案流程。
+- 一旦开放公网（含端口映射、内网穿透、临时隧道），**且服务器在中国大陆境内**，就需要先完成 ICP 备案（域名 + 接入商核验）与上线后 30 日内的公安联网备案，此时把 `INTRANET_ONLY` 设为 `"false"` 才匹配得上实际形态。
+- 备案与否不影响**等保**：校内自建信息系统一般仍需按学校要求做网络安全等级保护备案与测评，论坛这类交互式服务通常按二级要求准备。具体要求以学校网络中心/信息化办为准。
 
 ### 从旧版本升级
 
@@ -141,11 +168,14 @@ SELECT name, COUNT(*) c FROM users GROUP BY name HAVING c > 1;
 ```
 prisma/schema.prisma   # 数据模型
 src/lib/               # db / auth / api 信封 / 审核管线 / 提及 / 热榜 / users（作者信息可见性）
+src/middleware.ts      # 仅内网访问兜底（配合 src/lib/intranet.ts）
 src/app/api/           # 后端路由
 src/app/               # 页面（board, post, hot, search, messages, admin...）
 src/components/        # UI 组件
+deploy/                # 内网反向代理示例（nginx allow/deny）
 ```
 
 ## 内容安全提醒
 
-校内论坛面向学生，请先审后发管线 + 管理员巡查制度。国内服务器上线需完成 ICP 备案，并遵守《网络信息内容生态治理规定》；建议制定并公示社区公约与违规处理规则。
+校内论坛面向学生，请落实先审后发管线 + 管理员巡查制度，并遵守《网络信息内容生态治理规定》：建议制定并公示社区公约与违规处理规则。
+内网部署通常无需 ICP 备案，但**一旦开放公网**（境内服务器）就需先备案；无论是否备案，日志留存、内容处置与等保要求都照旧适用。

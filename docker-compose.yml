@@ -6,7 +6,8 @@ services:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: hzpu_forum
     ports:
-      - "3307:3306"
+      # 只绑本机：数据库不对局域网/公网暴露
+      - "127.0.0.1:3307:3306"
     volumes:
       - hzpu_mysql:/var/lib/mysql
     healthcheck:
@@ -19,7 +20,9 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      # 只绑本机：由同机 nginx 做 allow/deny 后对外提供服务（deploy/nginx-intranet.conf.example）。
+      # 若确实要让内网客户端直连 3000，改成 "3000:3000" 并在防火墙只放行内网网段。
+      - "127.0.0.1:3000:3000"
     depends_on:
       mysql:
         condition: service_healthy
@@ -28,6 +31,8 @@ services:
       SESSION_SECRET: "e0c991335be644e3fd22ac68d4e99f9c2c3157c8fc617ab5679b0983f0ba80a3"
       CRON_SECRET: "a3c59ce1900d261f33d364b4339c5e692880e7d062150ab5cc245f972b238b54"
       UPLOAD_DIR: /data/uploads
+      # 仅内网访问：外网来源返回 403。关闭需设 false，并自行完成 ICP 备案。
+      INTRANET_ONLY: "true"
       HOSTNAME: 0.0.0.0
     volumes:
       - hzpu_uploads:/data/uploads

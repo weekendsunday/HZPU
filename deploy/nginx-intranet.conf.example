@@ -1,0 +1,36 @@
+# 仅校内内网反向代理示例
+# 用法：把本文件拷到 nginx 的 conf.d/，改掉 server_name 与 upstream 后 reload。
+# 要点：① 只放行私网网段 ② 把真实来源 IP 透传给应用，供 middleware 兜底判定。
+
+upstream hzpu_forum {
+    server 127.0.0.1:3000;
+    keepalive 16;
+}
+
+server {
+    listen 80;
+    server_name forum.example.edu.cn;   # 换成校内 DNS 分配的名字
+
+    # ① 边界：只允许私网网段访问，其余一律 403。
+    #    若前面还有学校统一的出口/负载均衡，请按实际网段调整。
+    allow 10.0.0.0/8;
+    allow 172.16.0.0/12;
+    allow 192.168.0.0/16;
+    allow 127.0.0.1/32;
+    deny all;
+
+    client_max_body_size 8m;            # 图片上传上限 5MB，留点余量
+
+    location / {
+        proxy_pass http://hzpu_forum;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        # ② 真实来源 IP：必须用 $remote_addr **覆写**，不能用 $proxy_add_x_forwarded_for。
+        #    后者会把客户端自带的 X-Forwarded-For 保留在最左边，攻击者只要发一个
+        #    "X-Forwarded-For: 10.0.0.1" 就能伪装成内网地址、绕过应用的兜底判定。
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Connection        "";
+    }
+}
