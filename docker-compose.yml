@@ -28,6 +28,7 @@ services:
       SESSION_SECRET: "e0c991335be644e3fd22ac68d4e99f9c2c3157c8fc617ab5679b0983f0ba80a3"
       CRON_SECRET: "a3c59ce1900d261f33d364b4339c5e692880e7d062150ab5cc245f972b238b54"
       UPLOAD_DIR: /data/uploads
+      HOSTNAME: 0.0.0.0
     volumes:
       - hzpu_uploads:/data/uploads
 
