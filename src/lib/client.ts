@@ -66,6 +66,8 @@ export interface SessionUser {
   id: string;
   studentId: string;
   name: string;
+  /** 本人真实姓名；仅自己与管理员可见。 */
+  realName?: string;
   role: "USER" | "ADMIN";
   status: string;
 }

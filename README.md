@@ -1,17 +1,33 @@
 # HZPU 校园论坛
 
 参照浙江大学 CC98 的校内论坛：版块 + 标题楼层帖，学号注册，先审后发（自动审核），无匿名发帖。
+采用**昵称公开 + 实名留档**：昵称全站唯一并对外显示，真实姓名允许重名，仅本人与管理员可见。
 
 技术栈：Next.js 14 (App Router) + TypeScript + Prisma + MySQL。
 
 ## 功能
 
-- **账号**：学号 + 自设密码注册/登录（学号格式由 `STUDENT_ID_PATTERN` 环境变量控制，请按学校实际格式修改）
+- **账号**：学号 + 昵称 + 真实姓名 + 自设密码注册/登录（学号格式由 `STUDENT_ID_PATTERN` 环境变量控制，请按学校实际格式修改）
+- **实名与隐私**：昵称全站唯一（`@昵称` 提及因此不会串人）；真实姓名允许同名同姓，仅在本人与管理员视角下展示
 - **版块**：预置综合讨论/校园生活/学习交流/二手交易/失物招领，后台可增删改、锁定
 - **发帖/回帖**：Markdown 正文，图片上传存服务器磁盘；@姓名 提及自动产生通知
 - **审核管线**：本地敏感词库（后台 `/admin/words` 维护）→ 可选 LLM 审核 agent（配置 `MODERATION_LLM_URL` 启用，如本地 Ollama）；自动通过即发布，未通过进入人工审核队列（`/admin`）
 - **互动**：楼层回复、提及通知、站内私信（会话式）、全站搜索（帖子/用户）、热榜（回复/浏览加权 + 时间衰减）
 - **管理后台**：审核队列、版块管理、用户封禁/设管、敏感词、审核日志
+
+## 昵称与真实姓名
+
+用户表把「对外身份」和「实名信息」拆成两个字段，都有明确的唯一性约定：
+
+| 字段 | 含义 | 唯一性 | 可见范围 |
+| --- | --- | --- | --- |
+| `name` | 昵称，前台展示、`@提及` 的匹配依据 | **全站唯一**（数据库唯一索引 + 注册时校验） | 所有人 |
+| `realName` | 真实姓名，用于实名留档 | 允许重名 | 仅**本人**与**管理员** |
+
+可见性规则集中在 `src/lib/users.ts` 的 `authorView()`：所有返回作者信息的接口（帖子列表/详情、楼层、热榜、搜索、用户主页、审核队列、用户管理）都经过它裁剪，
+非本人且非管理员时 `realName` 字段直接从响应里省略，不是靠前端隐藏。前端对可见的真实姓名渲染为 `.real-name` 标签（`globals.css`）。
+
+> 说明：`realName` 为可选实名信息，历史数据默认空串；注册接口强制填写，未设置时该字段不下发（前端也不渲染）。
 
 ## 快速开始（Docker，推荐）
 
@@ -58,6 +74,17 @@ npm run dev
 
 数据备份：备份 `hzpu_mysql`（数据库）与 `hzpu_uploads`（图片）两个 docker volume。
 
+### 从旧版本升级
+
+本版本给 `users.name` 加了唯一索引、并新增 `users.real_name` 列，用 `prisma db push` 升级前请先自查：
+
+```sql
+-- 若返回结果非空，说明已有重名昵称，需要先人工改名，否则唯一索引创建会失败
+SELECT name, COUNT(*) c FROM users GROUP BY name HAVING c > 1;
+```
+
+`real_name` 带默认空串，历史数据可平滑升级；这些用户首次访问时前端不展示实名信息，可由管理员在后台补录或让其重新注册。
+
 ## 预留接口说明
 
 以下内容已有 API 契约/占位，未做完整实现或需要外部资源，接入时按需扩展：
@@ -74,7 +101,7 @@ npm run dev
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/api/auth/register` | 学号注册 `{studentId,name,password}` |
+| POST | `/api/auth/register` | 学号注册 `{studentId,name,realName,password}`，昵称重复返回 409 |
 | POST | `/api/auth/login` / `logout` | 登录 / 登出 |
 | GET | `/api/auth/me` | 当前用户 |
 | GET | `/api/boards` | 版块列表 |
@@ -98,7 +125,7 @@ npm run dev
 
 ```
 prisma/schema.prisma   # 数据模型
-src/lib/               # db / auth / api 信封 / 审核管线 / 提及 / 热榜
+src/lib/               # db / auth / api 信封 / 审核管线 / 提及 / 热榜 / users（作者信息可见性）
 src/app/api/           # 后端路由
 src/app/               # 页面（board, post, hot, search, messages, admin...）
 src/components/        # UI 组件

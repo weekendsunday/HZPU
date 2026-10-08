@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { ok, handle, parsePage } from "@/lib/api";
+import { authorView } from "@/lib/users";
 
 const querySchema = z.object({
   q: z.string().trim().min(1, "搜索词不能为空").max(50, "搜索词最多 50 字符"),
@@ -17,7 +19,7 @@ const POST_SUMMARY_SELECT = {
   createdAt: true,
   lastReplyAt: true,
   hotScore: true,
-  author: { select: { id: true, name: true } },
+  author: { select: { id: true, name: true, realName: true } },
   board: { select: { id: true, name: true, slug: true } },
 } as const;
 
@@ -49,6 +51,7 @@ export const GET = handle(async (req: NextRequest) => {
     status: "APPROVED" as const,
     OR: [{ title: { contains: q } }, { body: { contains: q } }],
   };
+  const viewer = await getCurrentUser();
   const [posts, total] = await Promise.all([
     prisma.post.findMany({
       where,
@@ -59,5 +62,10 @@ export const GET = handle(async (req: NextRequest) => {
     }),
     prisma.post.count({ where }),
   ]);
-  return ok({ posts, total, page, pageSize });
+  return ok({
+    posts: posts.map((p) => ({ ...p, author: authorView(p.author, viewer) })),
+    total,
+    page,
+    pageSize,
+  });
 });

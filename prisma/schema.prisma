@@ -13,7 +13,8 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   studentId    String   @unique @map("student_id") // 学号，注册唯一
-  name         String // 真实姓名或昵称，注册时填写
+  name         String   @unique // 昵称，全站唯一，前台公开显示
+  realName     String   @default("") @map("real_name") // 真实姓名，可重名，仅本人与管理员可见
   passwordHash String   @map("password_hash")
   role         Role     @default(USER) // USER | ADMIN
   status       UserStatus @default(ACTIVE) // ACTIVE | BANNED

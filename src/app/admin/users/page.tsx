@@ -10,6 +10,7 @@ interface AdminUser {
   id: string;
   studentId: string;
   name: string;
+  realName: string;
   role: Role;
   status: UserStatus;
   createdAt: string;
@@ -131,7 +132,8 @@ export default function AdminUsersPage() {
             <thead>
               <tr className="muted" style={{ textAlign: "left", fontSize: 13 }}>
                 <th style={{ padding: "8px" }}>学号</th>
-                <th style={{ padding: "8px" }}>姓名</th>
+                <th style={{ padding: "8px" }}>昵称</th>
+                <th style={{ padding: "8px" }}>真实姓名</th>
                 <th style={{ padding: "8px" }}>角色</th>
                 <th style={{ padding: "8px" }}>状态</th>
                 <th style={{ padding: "8px" }}>发帖数</th>
@@ -153,6 +155,13 @@ export default function AdminUsersPage() {
                         <span className="badge" style={{ marginLeft: 6 }}>
                           我
                         </span>
+                      )}
+                    </td>
+                    <td style={{ padding: "8px" }}>
+                      {u.realName ? (
+                        <span className="real-name">{u.realName}</span>
+                      ) : (
+                        <span className="muted">—</span>
                       )}
                     </td>
                     <td style={{ padding: "8px" }}>{u.role === "ADMIN" ? "管理员" : "用户"}</td>

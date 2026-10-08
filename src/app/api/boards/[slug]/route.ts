@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
-import { ApiError } from "@/lib/auth";
+import { ApiError, getCurrentUser } from "@/lib/auth";
 import { handle, ok, parsePage } from "@/lib/api";
+import { authorView } from "@/lib/users";
 
 const postSummarySelect = {
   id: true,
@@ -10,11 +11,12 @@ const postSummarySelect = {
   createdAt: true,
   lastReplyAt: true,
   hotScore: true,
-  author: { select: { id: true, name: true } },
+  author: { select: { id: true, name: true, realName: true } },
   board: { select: { id: true, name: true, slug: true } },
 } as const;
 
 export const GET = handle(async (_req, { params }: { params: { slug: string } }) => {
+  const viewer = await getCurrentUser();
   const board = await prisma.board.findUnique({ where: { slug: params.slug } });
   if (!board) throw new ApiError(404, "版块不存在");
 
@@ -42,7 +44,7 @@ export const GET = handle(async (_req, { params }: { params: { slug: string } })
       description: board.description,
       locked: board.locked,
     },
-    posts,
+    posts: posts.map((p) => ({ ...p, author: authorView(p.author, viewer) })),
     total,
     page,
     pageSize,

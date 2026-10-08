@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { api, getClientUser } from "@/lib/client";
+import type { SessionUser } from "@/lib/client";
 import { Editor } from "@/components/Editor";
 import { AuthGuard } from "@/components/AuthGuard";
 
@@ -25,10 +26,15 @@ function NewPostInner() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [user, setUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
     getClientUser().then((u) => {
-      if (!u) router.replace(`/login?next=${encodeURIComponent("/new")}`);
+      if (!u) {
+        router.replace(`/login?next=${encodeURIComponent("/new")}`);
+        return;
+      }
+      setUser(u);
     });
     api<{ boards: Board[] }>("/api/boards")
       .then((d) => {
@@ -72,6 +78,11 @@ function NewPostInner() {
   return (
     <div>
       <h2>发布新帖</h2>
+      <div className="banner banner-warning">
+        实名记录：本贴会以真实姓名
+        {user?.realName ? `「${user.realName}」` : ""}
+        归档，仅你本人与管理员可见；其他同学看到的仍是你的昵称。
+      </div>
       <form onSubmit={onSubmit}>
         <div className="form-field">
           <label htmlFor="board">版块</label>

@@ -487,6 +487,19 @@ select.input {
 
 /* ---------- Markdown 正文 ---------- */
 
+/* ---------- 真实姓名（仅本人与管理员可见） ---------- */
+
+.real-name {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  font-size: 12px;
+  line-height: 18px;
+  vertical-align: middle;
+}
+
 .markdown {
   word-break: break-word;
   overflow-wrap: anywhere;

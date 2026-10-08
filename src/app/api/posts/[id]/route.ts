@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { ApiError, getCurrentUser } from "@/lib/auth";
 import { handle, ok } from "@/lib/api";
 import { hotScore } from "@/lib/hot";
+import { authorView } from "@/lib/users";
 
 export const GET = handle(async (_req, { params }: { params: { id: string } }) => {
   const user = await getCurrentUser();
@@ -29,7 +30,7 @@ export const GET = handle(async (_req, { params }: { params: { id: string } }) =
     },
   });
 
-  const post = await prisma.post.findUniqueOrThrow({
+  const row = await prisma.post.findUniqueOrThrow({
     where: { id: existing.id },
     select: {
       id: true,
@@ -40,10 +41,15 @@ export const GET = handle(async (_req, { params }: { params: { id: string } }) =
       viewCount: true,
       replyCount: true,
       createdAt: true,
-      author: { select: { id: true, name: true, studentId: true } },
+      author: { select: { id: true, name: true, realName: true, studentId: true } },
       board: { select: { id: true, name: true, slug: true } },
     },
   });
+  // 真实姓名仅本人与管理员可见，学号保持原样下发
+  const post = {
+    ...row,
+    author: { ...authorView(row.author, user), studentId: row.author.studentId },
+  };
 
   const floors = await prisma.floor.findMany({
     where: { postId: existing.id, status: "APPROVED" },
@@ -53,9 +59,12 @@ export const GET = handle(async (_req, { params }: { params: { id: string } }) =
       floorNo: true,
       content: true,
       createdAt: true,
-      author: { select: { id: true, name: true } },
+      author: { select: { id: true, name: true, realName: true } },
     },
   });
 
-  return ok({ post, floors });
+  return ok({
+    post,
+    floors: floors.map((f) => ({ ...f, author: authorView(f.author, user) })),
+  });
 });

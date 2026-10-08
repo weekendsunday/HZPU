@@ -11,7 +11,7 @@ interface QueueItem {
   status: Status;
   rejectReason: string | null;
   createdAt: string;
-  author: { id: string; name: string; studentId?: string };
+  author: { id: string; name: string; realName?: string; studentId?: string };
   title?: string;
   body?: string;
   content?: string;
@@ -157,7 +157,13 @@ export default function AdminModerationPage() {
                     </div>
                     <div className="muted" style={{ fontSize: 13 }}>
                       {item.board ? `版块：${item.board.name} · ` : ""}
-                      作者：{item.author.name} · {fmtTime(item.createdAt)}
+                      作者：{item.author.name}
+                      {item.author.realName && (
+                        <span className="real-name" style={{ marginLeft: 6 }}>
+                          {item.author.realName}
+                        </span>
+                      )}{" "}
+                      · {fmtTime(item.createdAt)}
                     </div>
                     {item.status === "REJECTED" && item.rejectReason && (
                       <div className="banner-danger" style={{ marginTop: 8 }}>

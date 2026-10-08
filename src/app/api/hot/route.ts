@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { ok, handle } from "@/lib/api";
+import { authorView } from "@/lib/users";
 
 const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -16,11 +18,12 @@ const POST_SUMMARY_SELECT = {
   createdAt: true,
   lastReplyAt: true,
   hotScore: true,
-  author: { select: { id: true, name: true } },
+  author: { select: { id: true, name: true, realName: true } },
   board: { select: { id: true, name: true, slug: true } },
 } as const;
 
 export const GET = handle(async (req: NextRequest) => {
+  const viewer = await getCurrentUser();
   const { limit } = querySchema.parse({
     limit: req.nextUrl.searchParams.get("limit") ?? undefined,
   });
@@ -32,5 +35,5 @@ export const GET = handle(async (req: NextRequest) => {
     take: limit,
   });
 
-  return ok({ posts });
+  return ok({ posts: posts.map((p) => ({ ...p, author: authorView(p.author, viewer) })) });
 });

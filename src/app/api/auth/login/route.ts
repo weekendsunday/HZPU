@@ -26,6 +26,7 @@ export const POST = handle(async (req) => {
     id: user.id,
     studentId: user.studentId,
     name: user.name,
+    realName: user.realName,
     role: user.role,
     status: user.status,
   };

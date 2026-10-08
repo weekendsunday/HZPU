@@ -16,7 +16,7 @@ interface PostDetail {
   viewCount: number;
   replyCount: number;
   createdAt: string;
-  author: { id: string; name: string; studentId: string };
+  author: { id: string; name: string; studentId: string; realName?: string };
   board: { id: string; name: string; slug: string };
 }
 
@@ -25,7 +25,7 @@ interface Floor {
   floorNo: number;
   content: string;
   createdAt: string;
-  author: { id: string; name: string };
+  author: { id: string; name: string; realName?: string };
 }
 
 export default function PostPage({ params }: { params: { id: string } }) {
@@ -97,6 +97,14 @@ export default function PostPage({ params }: { params: { id: string } }) {
       <h2 style={{ marginBottom: 4 }}>{post.title}</h2>
       <div className="muted" style={{ marginBottom: 16 }}>
         <Link href={`/user/${post.author.id}`}>{post.author.name}</Link> ·{" "}
+        {post.author.realName && (
+          <>
+            <span className="real-name" title="真实姓名 · 仅本人与管理员可见">
+              真实姓名：{post.author.realName}
+            </span>{" "}
+            ·{" "}
+          </>
+        )}
         {fmtTime(post.createdAt)} · 浏览 {post.viewCount} · 回复 {post.replyCount}
       </div>
 
@@ -127,6 +135,11 @@ export default function PostPage({ params }: { params: { id: string } }) {
               <div className="floor-body">
                 <div className="floor-head">
                   <Link href={`/user/${f.author.id}`}>{f.author.name}</Link>
+                  {f.author.realName && (
+                    <span className="real-name" title="真实姓名 · 仅本人与管理员可见">
+                      {f.author.realName}
+                    </span>
+                  )}
                   <span className="floor-no">#{f.floorNo} 楼 · {fmtTime(f.createdAt)}</span>
                 </div>
                 <MarkdownView content={f.content} />

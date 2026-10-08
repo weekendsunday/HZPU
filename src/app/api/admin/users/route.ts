@@ -39,6 +39,7 @@ export const GET = handle(async (req: NextRequest) => {
         id: true,
         studentId: true,
         name: true,
+        realName: true,
         role: true,
         status: true,
         createdAt: true,

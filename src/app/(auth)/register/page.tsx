@@ -9,6 +9,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [studentId, setStudentId] = useState("");
   const [name, setName] = useState("");
+  const [realName, setRealName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,7 +25,7 @@ export default function RegisterPage() {
     try {
       await api("/api/auth/register", {
         method: "POST",
-        body: { studentId, name, password },
+        body: { studentId, name, realName, password },
       });
       router.push("/");
       router.refresh();
@@ -52,7 +53,7 @@ export default function RegisterPage() {
           <div className="hint">学号为 12 位数字，注册后不可修改</div>
         </div>
         <div className="form-field">
-          <label htmlFor="name">姓名 / 昵称</label>
+          <label htmlFor="name">昵称</label>
           <input
             id="name"
             className="input"
@@ -61,6 +62,19 @@ export default function RegisterPage() {
             autoComplete="nickname"
             required
           />
+          <div className="hint">全站唯一，不可与他人重复；发帖时对外显示的就是昵称</div>
+        </div>
+        <div className="form-field">
+          <label htmlFor="realName">真实姓名</label>
+          <input
+            id="realName"
+            className="input"
+            value={realName}
+            onChange={(e) => setRealName(e.target.value)}
+            autoComplete="name"
+            required
+          />
+          <div className="hint">仅你本人与管理员可见，允许同名同姓</div>
         </div>
         <div className="form-field">
           <label htmlFor="password">密码</label>

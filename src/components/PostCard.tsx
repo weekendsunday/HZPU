@@ -10,7 +10,7 @@ export interface PostSummary {
   viewCount: number;
   createdAt: string;
   lastReplyAt: string;
-  author: { id: string; name: string };
+  author: { id: string; name: string; realName?: string };
   board: { id: string; name: string; slug: string };
 }
 
@@ -20,6 +20,11 @@ export function PostCard({ post }: { post: PostSummary }) {
       <span className="post-title">{post.title}</span>
       <span className="post-meta">
         <span>{post.author.name}</span>
+        {post.author.realName && (
+          <span className="real-name" title="真实姓名 · 仅本人与管理员可见">
+            {post.author.realName}
+          </span>
+        )}
         <span>{post.board.name}</span>
         <span>回复 {post.replyCount}</span>
         <span>浏览 {post.viewCount}</span>

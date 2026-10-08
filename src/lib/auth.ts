@@ -10,7 +10,7 @@ const secret = new TextEncoder().encode(
 
 export type SessionUser = Pick<
   User,
-  "id" | "studentId" | "name" | "role" | "status"
+  "id" | "studentId" | "name" | "realName" | "role" | "status"
 >;
 
 export async function createSessionToken(user: SessionUser): Promise<string> {
@@ -59,7 +59,14 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!payload) return null;
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { id: true, studentId: true, name: true, role: true, status: true },
+    select: {
+      id: true,
+      studentId: true,
+      name: true,
+      realName: true,
+      role: true,
+      status: true,
+    },
   });
   if (!user || user.status !== "ACTIVE") return null;
   return user;
