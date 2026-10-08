@@ -33,7 +33,11 @@ function LoginForm() {
 
   return (
     <div className="card auth-card">
-      <h2>登录</h2>
+      <div className="auth-brand">
+        <img className="auth-logo" src="/logo.png" alt="杭州职业技术大学" />
+        <h1 className="auth-title">登录校园论坛</h1>
+        <p className="auth-sub">使用学号登录</p>
+      </div>
       <form onSubmit={onSubmit}>
         <div className="form-field">
           <label htmlFor="studentId">学号</label>

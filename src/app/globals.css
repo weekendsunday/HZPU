@@ -4,8 +4,11 @@
   --bg: #f6f7f9;
   --fg: #1f2329;
   --muted: #6b7280;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  /* 杭职蓝：取自校徽主色 */
+  --brand: #284878;
+  --brand-dark: #1d3760;
+  --primary: #284878;
+  --primary-hover: #1d3760;
   --border: #e2e5ea;
   --card: #ffffff;
   --danger: #dc2626;
@@ -96,10 +99,20 @@ main.container {
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
   font-size: 17px;
   color: var(--fg);
   white-space: nowrap;
+}
+
+.brand .emblem {
+  width: 28px;
+  height: 28px;
+  display: block;
+  flex-shrink: 0;
 }
 
 .brand:hover {
@@ -336,6 +349,56 @@ select.input {
 .auth-card {
   max-width: 400px;
   margin: 40px auto;
+}
+
+.auth-card-wide {
+  max-width: 520px;
+}
+
+/* ---------- 认证页品牌区 ---------- */
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.auth-brand .auth-logo {
+  width: 280px;
+  max-width: 100%;
+  height: auto;
+  margin-bottom: 10px;
+}
+
+.auth-brand .auth-title {
+  font-size: 19px;
+  margin: 0;
+}
+
+.auth-brand .auth-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-note {
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
 }
 
 /* ---------- 列表项 ---------- */
@@ -722,6 +785,10 @@ select.input {
   }
 
   .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-row {
     grid-template-columns: 1fr;
   }
 

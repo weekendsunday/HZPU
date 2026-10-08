@@ -67,7 +67,8 @@ export function Header({ user, siteName }: { user: SessionUser | null; siteName:
           ☰
         </button>
         <Link href="/" className="brand" onClick={() => setMenuOpen(false)}>
-          {siteName}
+          <img className="emblem" src="/emblem.png" alt="" />
+          <span>{siteName}</span>
         </Link>
         <nav className={`nav-links${menuOpen ? " open" : ""}`}>{nav}</nav>
         <div className="header-actions">
